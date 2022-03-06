@@ -4,6 +4,7 @@
     <el-scrollbar wrap-class="scrollbar-wrapper">
       <el-menu
         :default-active="activeMenu"
+        :default-openeds="defaultOpeneds"
         :collapse="isCollapse"
         :background-color="variables.menuBg"
         :text-color="variables.menuText"
@@ -32,6 +33,15 @@ export default {
     ]),
     routes() {
       return this.$router.options.routes
+    },
+    defaultOpeneds() {
+      const routes = this.$router.options.routes
+      const len = this.$router.options.routes.length
+      const openeds = []
+      for (let i = 0; i < len; i++) {
+        openeds.push(routes[i]?.path)
+      }
+      return openeds
     },
     activeMenu() {
       const route = this.$route

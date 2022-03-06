@@ -28,10 +28,17 @@ if (process.env.NODE_ENV === 'production') {
   mockXHR()
 }
 
+import VueMaterial from '@ouyeel/vue-material/@ouyeel/vue-material.js'
+import '@ouyeel/vue-material/@ouyeel/vue-material.css'
+
+import 'highlight.js/styles/atom-one-dark.css'
+import 'github-markdown-css'
+
 // set ElementUI lang to EN
-Vue.use(ElementUI, { locale })
+// Vue.use(ElementUI, { locale })
 // 如果想要中文版 element-ui，按如下方式声明
-// Vue.use(ElementUI)
+Vue.use(ElementUI)
+Vue.use(VueMaterial)
 
 Vue.config.productionTip = false
 
