@@ -9,6 +9,7 @@ import icon from '@/router/icon'
 import list from '@/router/list'
 import search from '@/router/search'
 import other from '@/router/other'
+import filter from '@/router/filter'
 
 Vue.use(Router)
 
@@ -47,7 +48,8 @@ export const constantRoutes = [
   menu,
   list,
   search,
-  other
+  other,
+  filter
 ]
 
 const createRouter = () => new Router({
