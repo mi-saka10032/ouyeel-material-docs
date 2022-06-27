@@ -6,6 +6,7 @@
         :key="index"
         :label="item.value"
         :disabled="item.disabled"
+        @change="onMultipleCheckboxChange(index, item, $event)"
       >
         {{ item.label }}
       </el-checkbox>
@@ -81,6 +82,9 @@ export default {
       this.$emit('on-checkbox-change', item, checked)
       this.innerValue = checked ? [item.value] : []
     },
+    onMultipleCheckboxChange(_, item, checked) {
+      console.log(item)
+    }
   },
 }
 </script>

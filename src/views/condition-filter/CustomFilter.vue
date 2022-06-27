@@ -17,22 +17,24 @@
         </template>
       </selected-list>
     </filter-container>
-    <div v-for="(item, index) in testLists" :key="index">
-      <filter-container :title="item.title">
-        <filter-checkbox-group
-          v-if="item.type === 'radio'"
-          v-model="item.model"
-          :options="item.options"
-          @on-change="onConditionChange"
-        />
-        <collapse-checkbox-group
-          v-else-if="item.type === 'checkbox'"
-          v-model="item.model"
-          :options="item.options"
-          @on-change="onConditionChange"
-        />
-      </filter-container>
-    </div>
+    <filter-container
+      v-for="(item, index) in testLists"
+      :key="index"
+      :title="item.title"
+    >
+      <filter-checkbox-group
+        v-if="item.type === 'radio'"
+        v-model="item.model"
+        :options="item.options"
+        @on-change="onConditionChange"
+      />
+      <collapse-checkbox-group
+        v-else-if="item.type === 'checkbox'"
+        v-model="item.model"
+        :options="item.options"
+        @on-change="onConditionChange"
+      />
+    </filter-container>
   </div>
 </template>
 
