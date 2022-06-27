@@ -12,11 +12,11 @@
     <div v-show="!multiple" class="operate_wrapper">
       <span class="operate_item" @click="onClickMultiple">
         多选
-        <i class="ouyeelfont oyicon-plus" />
+        <em class="ouyeelfont oyicon-plus" />
       </span>
       <span v-if="renderExpandButton" class="operate_item" @click="onClickExpand">
         {{ expandButtonText }}
-        <i class="ouyeelfont" :class="expandButtonArrow" />
+        <em class="ouyeelfont" :class="expandButtonArrow" />
       </span>
     </div>
     <div v-show="multiple">
@@ -99,8 +99,8 @@ export default {
 
         // 选中当前未选中的选项值，重置绑定值
         const { value: current } = this
-        for (let i = 0; i < value.length; i++) {
-          const item = value[i]
+        for (const element of value) {
+          const item = element
           if (!~current.indexOf(item)) {
             this.$emit('input', [item])
             this.$emit('on-change')
@@ -141,7 +141,7 @@ export default {
   methods: {
     judgeExpandButtonStatus() {
       const el = this.$refs.checkboxGroup.$el
-      this.renderExpandButton = el.offsetHeight > 30
+      this.renderExpandButton = el?.offsetHeight > 30
     },
     onClickMultiple() {
       this.multiple = true

@@ -16,7 +16,7 @@
         <template v-slot:info>
           <span v-show="totalCount">
             共<span style="color: #d90910">{{ totalCount }}</span
-          >条
+            >条
           </span>
           <slot name="export" />
         </template>
@@ -26,7 +26,6 @@
       <filter-checkbox-group
         v-model="biddingType"
         :options="biddingTypeOptions"
-        style="height: 20px; overflow: hidden"
         @on-change="onConditionChange"
       />
     </filter-container>
@@ -250,7 +249,7 @@ export default {
     '$route.name': 'onSearch',
   },
   mounted() {
-    // transformRouteQuery2States(this)
+    transformRouteQuery2States(this)
     this.getFilterParams()
     // 当前页点击品类树、顶部搜索
     event.on('search', this.onSearch)
@@ -289,7 +288,8 @@ export default {
 
         const params = transformStates2Params(this)
         this.beforeFetch(params)
-        const res = await getSearchConditions()
+        const res = await getSearchConditions(params)
+
         this.mergeConditions(res)
         this.createSelectedList()
 
@@ -301,9 +301,6 @@ export default {
       }
     },
     mergeConditions(conditions) {
-      console.log('================')
-      console.log(conditions)
-      console.log('================')
       const {
         keywordAnalysis,
         categoryOptions,
@@ -315,6 +312,8 @@ export default {
         statusOptions,
       } = conditions
 
+      console.log('111111111')
+      console.log(categoryOptions)
       controllers.keyword.updateOptions(this, keywordAnalysis)
       controllers.category.updateOptions(this, categoryOptions)
       controllers.seller.updateOptions(this, sellerOptions)

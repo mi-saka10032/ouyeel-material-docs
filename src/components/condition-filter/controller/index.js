@@ -90,7 +90,8 @@ export class BaseController {
     const values = ctx[key]
     const options = ctx[`${key}Options`]
     const result = []
-
+    debugger
+    console.log(options)
     for (let i = 0; i < options.length; i++) {
       const { value, label } = options[i]
       if (~values.indexOf(value)) {
@@ -100,7 +101,7 @@ export class BaseController {
         })
       }
     }
-
+    debugger
     return result
   }
 

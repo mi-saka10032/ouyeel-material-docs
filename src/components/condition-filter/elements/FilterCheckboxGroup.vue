@@ -77,7 +77,7 @@ export default {
     },
   },
   methods: {
-    onCheckboxChange(index, item, checked) {
+    onCheckboxChange(_, item, checked) {
       this.$emit('on-checkbox-change', item, checked)
       this.innerValue = checked ? [item.value] : []
     },
