@@ -1,7 +1,5 @@
 <template>
-  <div
-    class="condition_filter"
-  >
+  <div class="condition_filter">
     <filter-container :title-width="0">
       <selected-list :list="selectedList" @on-click-item="onClickSelectedItem">
         <template v-slot:prefix>筛选条件：</template>
@@ -10,15 +8,14 @@
         </template>
         <template v-slot:info>
           <span v-show="totalCount">
-            共<span style="color: #d90910">{{ totalCount }}</span
-          >条
+            共<span style="color: #d90910">{{ totalCount }}</span>条
           </span>
           <slot name="export" />
         </template>
       </selected-list>
     </filter-container>
     <filter-container
-      v-for="(item, index) in testLists"
+      v-for="(item, index) in localFilterItems"
       :key="index"
       :title="item.title"
     >
@@ -41,11 +38,12 @@
 </template>
 
 <script>
+import { Debounce, ParentCopy } from '@/utils/decorators'
 import cloneDeep from 'lodash/cloneDeep'
-import FilterContainer from '@/components/condition-filter/elements/FilterContainer';
-import SelectedList from '@/components/condition-filter/elements/SelectedList';
-import FilterCheckboxGroup from '@/components/condition-filter/elements/FilterCheckboxGroup';
-import CollapseCheckboxGroup from '@/components/condition-filter/elements/CollapseCheckboxGroup';
+import FilterContainer from '@/components/condition-filter/elements/FilterContainer'
+import SelectedList from '@/components/condition-filter/elements/SelectedList'
+import FilterCheckboxGroup from '@/components/condition-filter/elements/FilterCheckboxGroup'
+import CollapseCheckboxGroup from '@/components/condition-filter/elements/CollapseCheckboxGroup'
 
 export default {
   name: 'CustomFilter',
@@ -56,7 +54,7 @@ export default {
     CollapseCheckboxGroup
   },
   props: {
-    testLists: {
+    filterItems: {
       type: Array,
       default: () => ([
         {
@@ -347,40 +345,45 @@ export default {
           ]
         }
       ])
-    },
+    }
   },
   data: () => ({
-    totalCount: 100,
+    // 总数
+    totalCount: 0,
+    // 筛选条件列表
     selectedList: [],
-    cacheOptionsList: [],
-    filter: {},
-    debounceTimer: null
+    localFilterItems: [],
+    // 原始筛选条件缓存列表
+    cacheFilterItems: [],
+    // 筛选条件对象
+    filter: {}
   }),
-  mounted() {
-    // 为每一个子选项设置引用的父选项对象
-    this.testLists.forEach(list => {
-      if (list.options instanceof Array) {
-        list.options.forEach(option => {
-          if (option.info instanceof Array) {
-            option.info.forEach(info => {
-              this.$set(info, 'parent', cloneDeep(option))
-            })
-          }
-        })
-      }
-    })
-    // 深拷贝一个props
-    this.cacheOptionsList = cloneDeep(this.testLists.map(item => item.options))
-  },
   watch: {
-    testLists: {
+    filterItems: {
       deep: true,
       immediate: true,
-      handler(lists) {
-        if (lists instanceof Array) {
-          lists.forEach(item => {
-            this.$set(this.filter, item.prop, item.model)
-          })
+      @ParentCopy()
+      handler(items) {
+        let cloneItems = cloneDeep(items)
+        let cloneOptions = cloneDeep(items.map(item => item.options))
+        this.localFilterItems = cloneItems
+        this.cacheFilterItems = cloneOptions
+        cloneItems = null
+        cloneOptions = null
+      }
+    },
+    localFilterItems: {
+      deep: true,
+      immediate: true,
+      handler(items) {
+        if (items instanceof Array) {
+          for (const item of items) {
+            if (this.filter[item.prop]) {
+              this.filter[item.prop] = item.model
+            } else {
+              this.$set(this.filter, item.prop, item.model)
+            }
+          }
         }
       }
     }
@@ -392,21 +395,18 @@ export default {
     onClickReset() {
       console.log(arguments)
     },
-    // 选项变化防抖
+    // 选项变化方法-防抖
+    @Debounce(100)
     onConditionChange() {
-      clearTimeout(this.debounceTimer)
-      this.debounceTimer = setTimeout(() => {
-        this.debounceConditionChange()
-      }, 100)
-    },
-    debounceConditionChange() {
       console.log(this.filter)
     },
-    forceRenderingCheckbox(item) {
+    // 组件强制重载渲染
+    forceRendering(item) {
       // 组件强制重新渲染
+      const originalType = item.type
       item.type = ''
       this.$nextTick(() => {
-        item.type = 'checkbox'
+        item.type = originalType
       })
     },
     // 复杂多选框在单选模式下点击选项的回调函数
@@ -416,29 +416,35 @@ export default {
       } else {
         this.handleUncheckedSingleCheckboxOptions(option, item, index)
       }
-      this.forceRenderingCheckbox(item)
+      this.forceRendering(item)
     },
+    // 复杂多选框-单选模式-选中状态回调
     handleCheckedSingleCheckboxOptions(option, item) {
       // 如果为选中状态，存在三种情况，均需要操作item.options
-      if (option.info instanceof Array) {
+      let cloneOption = cloneDeep(option)
+      if (cloneOption.info instanceof Array) {
         // 1.选项中存在子选项info，item.options显示当前选项和info选项
-        item.options = cloneDeep([option, ...option.info])
-      } else if (option.parent instanceof Object) {
+        item.options = [cloneOption, ...cloneOption.info]
+      } else if (cloneOption.parent instanceof Object) {
         // 2.选项中存在父选项parent，这种情况只有在父选项点击过一次之后出现(即条件1触发之后才有机会触发)，item.options显示其父选项和当前选项
-        option.parent.info.forEach(info => {
-          this.$set(info, 'parent', cloneDeep(option.parent))
-        })
-        item.options = cloneDeep([option.parent, option])
+        for (const info of cloneOption.parent.info) {
+          if (!info.parent) {
+            info.parent = cloneDeep(cloneOption.parent)
+          }
+        }
+        item.options = [cloneOption.parent, cloneOption]
       } else {
         // 3.选项中既不存在父选项parent，也不存在子选项info，item.options仅显示当前选项
-        item.options = cloneDeep([option])
+        item.options = [cloneOption]
       }
+      cloneOption = null
     },
+    // 复杂多选框-单选模式-未选中状态回调
     handleUncheckedSingleCheckboxOptions(option, item, index) {
       // 如果非选中状态，存在两种情况，单选模式下取消选中和多选模式下取消选中
       if (this.filter[item.prop]?.length === 1) {
         // 单选取消选中时，直接从闭包缓存中重置全部配置选项
-        item.options = cloneDeep(this.cacheOptionsList[index])
+        item.options = cloneDeep(this.cacheFilterItems[index])
       } else {
         // 复选取消选中时，根据option.value的值，来判断需要删除的选项
         const value = option.value
@@ -453,41 +459,42 @@ export default {
         }))
         if (remains.length) {
           // 如果剩余选项长度不为0，则深拷贝赋值当前选项
-          item.options = cloneDeep(remains);
+          item.options = cloneDeep(remains)
         } else {
           // 如果无剩余选项，则从闭包缓存中重置全部配置选项
-          item.options = cloneDeep(this.cacheOptionsList[index])
+          item.options = cloneDeep(this.cacheFilterItems[index])
         }
         // 条件筛选中保存的实际已选中数据，根据剩余选项的元素做筛选，仅保留在场选项
         item.model = item.model.filter(model => remains.map(remain => remain.value).includes(model))
       }
     },
-    // 复杂多选框在复选模式下点击确定按钮的回调函数
+    // 复杂多选框-复选模式下-点击确定按钮回调
     updateMultipleCheckboxOptions(selectedList, item, index) {
       if (selectedList?.length) {
         const completeOptions = []
-        selectedList.forEach(list => {
+        for (const list of selectedList) {
           if (!list.parent) {
             if (list.info instanceof Array) {
               completeOptions.push(list, ...list.info)
             } else completeOptions.push(list)
           } else {
-            console.log(completeOptions.some(select => select.value === list.parent.value))
             if (!completeOptions.some(select => select.value === list.parent.value)) {
-              list.parent.info.forEach(info => {
-                this.$set(info, 'parent', cloneDeep(list.parent))
-              })
+              for (const info of list.parent.info) {
+                if (!info.parent) {
+                  this.$set(info, 'parent', cloneDeep(list.parent))
+                }
+              }
               completeOptions.push(list.parent, ...list.parent.info)
             }
           }
-        })
+        }
         item.options = cloneDeep(completeOptions)
       } else {
-        item.options = cloneDeep(this.cacheOptionsList[index])
+        item.options = cloneDeep(this.cacheFilterItems[index])
       }
-      this.forceRenderingCheckbox(item)
+      this.forceRendering(item)
     }
-  },
+  }
 }
 </script>
 
