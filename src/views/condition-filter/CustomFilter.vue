@@ -34,7 +34,7 @@
         :options="item.options"
         @on-change="onConditionChange"
         @update-singleCheckboxOptions="updateSingleCheckboxOptions($event, item, index)"
-        @update-multipleCheckboxOptions="updateMultipleCheckboxOptions($event, item)"
+        @update-multipleCheckboxOptions="updateMultipleCheckboxOptions($event, item, index)"
       />
     </filter-container>
   </div>
@@ -441,7 +441,7 @@ export default {
       this.forceRenderingCheckbox(item)
     },
     // 复杂多选框在复选模式下点击确定按钮的回调函数
-    updateMultipleCheckboxOptions(selectedList, item) {
+    updateMultipleCheckboxOptions(selectedList, item, index) {
       if (selectedList?.length) {
         const completeOptions = [];
         selectedList.forEach(list => {
@@ -449,11 +449,15 @@ export default {
             if (list.info instanceof Array) {
               completeOptions.push(list, ...list.info)
             } else completeOptions.push(list)
+          } else {
+            if (selectedList.includes(list)) {
+              completeOptions.push(list)
+            }
           }
         })
         item.options = cloneDeep(completeOptions)
       } else {
-        item.options = cloneDeep(this.cacheOptionsList)
+        item.options = cloneDeep(this.cacheOptionsList[index])
       }
       this.forceRenderingCheckbox(item)
     }
