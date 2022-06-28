@@ -8,7 +8,7 @@
       multiple
       :options="options"
       :hidden-checkbox="!multiple"
-      v-on="$listeners"
+      @update-singleCheckboxOptions="updateSingleCheckboxOptions"
     />
     <div v-show="!multiple" class="operate_wrapper">
       <span class="operate_item" @click="onClickMultiple">
@@ -42,6 +42,7 @@
 import FilterCheckboxGroup from './FilterCheckboxGroup.vue'
 import SelectedList from './SelectedList.vue'
 import FilterButton from './FilterButton.vue'
+import cloneDeep from 'lodash/cloneDeep';
 
 export default {
   name: 'CollapseCheckboxGroup',
@@ -146,7 +147,7 @@ export default {
     },
     onClickMultiple() {
       this.multiple = true
-      this.multipleValue = this.value
+      this.multipleValue = cloneDeep(this.value)
     },
     onClickExpand() {
       this.expanded = !this.expanded
@@ -171,6 +172,9 @@ export default {
 
       this.$nextTick(() => this.judgeExpandButtonStatus())
     },
+    updateSingleCheckboxOptions() {
+      this.$emit('update-singleCheckboxOptions', ...arguments)
+    }
   },
 }
 </script>

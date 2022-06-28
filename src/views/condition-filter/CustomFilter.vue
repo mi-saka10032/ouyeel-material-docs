@@ -411,47 +411,73 @@ export default {
     },
     // 复杂多选框在单选模式下点击选项的回调函数
     updateSingleCheckboxOptions({ option, checked }, item, index) {
-      // 如果为选中状态，存在三种情况，均需要操作item.options
       if (checked) {
-        if (option.info instanceof Array) {
-          // 1.选项中存在子选项info，item.options显示当前选项和info选项
-          item.options = cloneDeep([option, ...option.info])
-        } else if (option.parent instanceof Object) {
-          // 2.选项中存在父选项parent，这种情况只有在父选项点击过一次之后出现(即条件1触发之后才有机会触发)，item.options显示其父选项和当前选项
-          item.options = cloneDeep([option.parent, option])
-        } else {
-          // 3.选项中既不存在父选项parent，也不存在子选项info，item.options仅显示当前选项
-          item.options = cloneDeep([option])
-        }
+        this.handleCheckedSingleCheckboxOptions(option, item)
       } else {
-        if (this.filter[item.prop]?.length === 1) {
-          item.options = cloneDeep(this.cacheOptionsList[index])
-        } else {
-          const value = option.value
-          const remains = cloneDeep(item.options.filter(remainOption => {
-            if (remainOption.parent) {
-              return remainOption.value === value || remainOption.parent?.value.indexOf(value)
-            } else {
-              return remainOption.value.indexOf(value)
-            }
-          }))
-          item.options = cloneDeep(remains)
-        }
+        this.handleUncheckedSingleCheckboxOptions(option, item, index)
       }
       this.forceRenderingCheckbox(item)
+    },
+    handleCheckedSingleCheckboxOptions(option, item) {
+      // 如果为选中状态，存在三种情况，均需要操作item.options
+      if (option.info instanceof Array) {
+        // 1.选项中存在子选项info，item.options显示当前选项和info选项
+        item.options = cloneDeep([option, ...option.info])
+      } else if (option.parent instanceof Object) {
+        // 2.选项中存在父选项parent，这种情况只有在父选项点击过一次之后出现(即条件1触发之后才有机会触发)，item.options显示其父选项和当前选项
+        option.parent.info.forEach(info => {
+          this.$set(info, 'parent', cloneDeep(option.parent))
+        })
+        item.options = cloneDeep([option.parent, option])
+      } else {
+        // 3.选项中既不存在父选项parent，也不存在子选项info，item.options仅显示当前选项
+        item.options = cloneDeep([option])
+      }
+    },
+    handleUncheckedSingleCheckboxOptions(option, item, index) {
+      // 如果非选中状态，存在两种情况，单选模式下取消选中和多选模式下取消选中
+      if (this.filter[item.prop]?.length === 1) {
+        // 单选取消选中时，直接从闭包缓存中重置全部配置选项
+        item.options = cloneDeep(this.cacheOptionsList[index])
+      } else {
+        // 复选取消选中时，根据option.value的值，来判断需要删除的选项
+        const value = option.value
+        const remains = cloneDeep(item.options.filter(remainOption => {
+          if (remainOption.parent) {
+            // 如果取消的是子选项(含有parent)，则该选项、其兄弟选项、其父选项均保留
+            return remainOption.value === value || remainOption.parent?.value.indexOf(value)
+          } else {
+            // 如果取消的是父选项，则删除该选项和其所有子选项
+            return remainOption.value.indexOf(value)
+          }
+        }))
+        if (remains.length) {
+          // 如果剩余选项长度不为0，则深拷贝赋值当前选项
+          item.options = cloneDeep(remains);
+        } else {
+          // 如果无剩余选项，则从闭包缓存中重置全部配置选项
+          item.options = cloneDeep(this.cacheOptionsList[index])
+        }
+        // 条件筛选中保存的实际已选中数据，根据剩余选项的元素做筛选，仅保留在场选项
+        item.model = item.model.filter(model => remains.map(remain => remain.value).includes(model))
+      }
     },
     // 复杂多选框在复选模式下点击确定按钮的回调函数
     updateMultipleCheckboxOptions(selectedList, item, index) {
       if (selectedList?.length) {
-        const completeOptions = [];
+        const completeOptions = []
         selectedList.forEach(list => {
           if (!list.parent) {
             if (list.info instanceof Array) {
               completeOptions.push(list, ...list.info)
             } else completeOptions.push(list)
           } else {
-            if (selectedList.includes(list)) {
-              completeOptions.push(list)
+            console.log(completeOptions.some(select => select.value === list.parent.value))
+            if (!completeOptions.some(select => select.value === list.parent.value)) {
+              list.parent.info.forEach(info => {
+                this.$set(info, 'parent', cloneDeep(list.parent))
+              })
+              completeOptions.push(list.parent, ...list.parent.info)
             }
           }
         })
