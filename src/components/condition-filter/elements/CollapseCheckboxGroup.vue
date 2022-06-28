@@ -8,6 +8,7 @@
       multiple
       :options="options"
       :hidden-checkbox="!multiple"
+      v-on="$listeners"
     />
     <div v-show="!multiple" class="operate_wrapper">
       <span class="operate_item" @click="onClickMultiple">
@@ -156,6 +157,7 @@ export default {
     onConfirm() {
       this.$emit('input', this.multipleValue)
       this.$emit('on-change')
+      this.$emit('update-multipleCheckboxOptions', this.selectedList)
       this.multiple = false
     },
     onCancel() {

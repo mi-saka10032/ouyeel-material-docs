@@ -1,12 +1,17 @@
 <template>
-  <div class="checkbox_group_com" :class="hiddenCheckbox ? 'checkbox_group_com_hidden' : ''">
-    <el-checkbox-group v-if="multiple" v-model="innerValue" :disabled="disabled">
+  <div class="checkbox_group_com">
+    <el-checkbox-group
+      v-if="multiple"
+      v-model="innerValue"
+      :disabled="disabled"
+      :class="hiddenCheckbox ? 'checkbox_group_com_hidden' : ''"
+    >
       <el-checkbox
         v-for="(item, index) in options"
         :key="index"
         :label="item.value"
         :disabled="item.disabled"
-        @change="onMultipleCheckboxChange(index, item, $event)"
+        @change="onSingleCheckboxChange(index, item, $event)"
       >
         {{ item.label }}
       </el-checkbox>
@@ -82,8 +87,19 @@ export default {
       this.$emit('on-checkbox-change', item, checked)
       this.innerValue = checked ? [item.value] : []
     },
-    onMultipleCheckboxChange(_, item, checked) {
-      console.log(item)
+    onSingleCheckboxChange(_, item, checked) {
+      if (this.hiddenCheckbox) {
+        if (checked) {
+          this.innerValue = [item.value];
+        } else {
+          if (this.value.length === 1) {
+            this.innerValue = [];
+          } else {
+            this.innerValue = this.innerValue.filter(inner => inner !== item.value)
+          }
+        }
+        this.$emit('update-singleCheckboxOptions', { option: item, checked });
+      }
     }
   },
 }
@@ -96,6 +112,7 @@ export default {
 
     &__inner {
       transition: all 0.2s;
+
       &:hover {
         border-color: #d90910;
       }
@@ -114,6 +131,7 @@ export default {
       margin: 0;
       color: #333;
       transition: all 0.2s;
+
       &:hover {
         color: #d90910;
       }

@@ -33,12 +33,15 @@
         v-model="item.model"
         :options="item.options"
         @on-change="onConditionChange"
+        @update-singleCheckboxOptions="updateSingleCheckboxOptions($event, item, index)"
+        @update-multipleCheckboxOptions="updateMultipleCheckboxOptions($event, item)"
       />
     </filter-container>
   </div>
 </template>
 
 <script>
+import cloneDeep from 'lodash/cloneDeep'
 import FilterContainer from '@/components/condition-filter/elements/FilterContainer';
 import SelectedList from '@/components/condition-filter/elements/SelectedList';
 import FilterCheckboxGroup from '@/components/condition-filter/elements/FilterCheckboxGroup';
@@ -349,8 +352,26 @@ export default {
   data: () => ({
     totalCount: 100,
     selectedList: [],
-    filter: {}
+    cacheOptionsList: [],
+    filter: {},
+    debounceTimer: null
   }),
+  mounted() {
+    // 为每一个子选项设置引用的父选项对象
+    this.testLists.forEach(list => {
+      if (list.options instanceof Array) {
+        list.options.forEach(option => {
+          if (option.info instanceof Array) {
+            option.info.forEach(info => {
+              this.$set(info, 'parent', cloneDeep(option))
+            })
+          }
+        })
+      }
+    })
+    // 深拷贝一个props
+    this.cacheOptionsList = cloneDeep(this.testLists.map(item => item.options))
+  },
   watch: {
     testLists: {
       deep: true,
@@ -371,10 +392,70 @@ export default {
     onClickReset() {
       console.log(arguments)
     },
+    // 选项变化防抖
     onConditionChange() {
-      console.log('打印filter')
+      clearTimeout(this.debounceTimer)
+      this.debounceTimer = setTimeout(() => {
+        this.debounceConditionChange()
+      }, 100)
+    },
+    debounceConditionChange() {
       console.log(this.filter)
-      console.log('打印filter')
+    },
+    forceRenderingCheckbox(item) {
+      // 组件强制重新渲染
+      item.type = ''
+      this.$nextTick(() => {
+        item.type = 'checkbox'
+      })
+    },
+    // 复杂多选框在单选模式下点击选项的回调函数
+    updateSingleCheckboxOptions({ option, checked }, item, index) {
+      // 如果为选中状态，存在三种情况，均需要操作item.options
+      if (checked) {
+        if (option.info instanceof Array) {
+          // 1.选项中存在子选项info，item.options显示当前选项和info选项
+          item.options = cloneDeep([option, ...option.info])
+        } else if (option.parent instanceof Object) {
+          // 2.选项中存在父选项parent，这种情况只有在父选项点击过一次之后出现(即条件1触发之后才有机会触发)，item.options显示其父选项和当前选项
+          item.options = cloneDeep([option.parent, option])
+        } else {
+          // 3.选项中既不存在父选项parent，也不存在子选项info，item.options仅显示当前选项
+          item.options = cloneDeep([option])
+        }
+      } else {
+        if (this.filter[item.prop]?.length === 1) {
+          item.options = cloneDeep(this.cacheOptionsList[index])
+        } else {
+          const value = option.value
+          const remains = cloneDeep(item.options.filter(remainOption => {
+            if (remainOption.parent) {
+              return remainOption.value === value || remainOption.parent?.value.indexOf(value)
+            } else {
+              return remainOption.value.indexOf(value)
+            }
+          }))
+          item.options = cloneDeep(remains)
+        }
+      }
+      this.forceRenderingCheckbox(item)
+    },
+    // 复杂多选框在复选模式下点击确定按钮的回调函数
+    updateMultipleCheckboxOptions(selectedList, item) {
+      if (selectedList?.length) {
+        const completeOptions = [];
+        selectedList.forEach(list => {
+          if (!list.parent) {
+            if (list.info instanceof Array) {
+              completeOptions.push(list, ...list.info)
+            } else completeOptions.push(list)
+          }
+        })
+        item.options = cloneDeep(completeOptions)
+      } else {
+        item.options = cloneDeep(this.cacheOptionsList)
+      }
+      this.forceRenderingCheckbox(item)
     }
   },
 }
