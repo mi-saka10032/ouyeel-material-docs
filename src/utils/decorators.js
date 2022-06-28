@@ -31,9 +31,12 @@ export function ParentCopy() {
             for (const option of item.options) {
               if (option.info instanceof Array) {
                 for (const info of option.info) {
-                  // 如果info对象上不存在parent对象，则$set创建响应式parent对象
-                  if (!info.parent) {
-                    info.parent = cloneDeep(option)
+                  // 如果info对象上不存在parent对象，则添加parent对象
+                  if ((!info.parent) && (typeof option.label === 'number' || 'string') && (typeof option.value === 'number' || 'string')) {
+                    info.parent = {
+                      label: option.label,
+                      value: option.value
+                    }
                   }
                 }
               }

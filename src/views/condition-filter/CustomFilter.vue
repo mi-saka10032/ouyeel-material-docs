@@ -354,7 +354,7 @@ export default {
     selectedList: [],
     localFilterItems: [],
     // 原始筛选条件缓存列表
-    cacheFilterItems: [],
+    cacheFilterOptions: [],
     // 筛选条件对象
     filter: {}
   }),
@@ -367,7 +367,7 @@ export default {
         let cloneItems = cloneDeep(items)
         let cloneOptions = cloneDeep(items.map(item => item.options))
         this.localFilterItems = cloneItems
-        this.cacheFilterItems = cloneOptions
+        this.cacheFilterOptions = cloneOptions
         cloneItems = null
         cloneOptions = null
       }
@@ -412,19 +412,21 @@ export default {
     // 复杂多选框在单选模式下点击选项的回调函数
     updateSingleCheckboxOptions({ option, checked }, item, index) {
       if (checked) {
-        this.handleCheckedSingleCheckboxOptions(option, item)
+        this.handleCheckedSingleCheckboxOptions(option, item, index)
       } else {
         this.handleUncheckedSingleCheckboxOptions(option, item, index)
       }
       this.forceRendering(item)
     },
     // 复杂多选框-单选模式-选中状态回调
-    handleCheckedSingleCheckboxOptions(option, item) {
+    handleCheckedSingleCheckboxOptions(option, item, index) {
       // 如果为选中状态，存在三种情况，均需要操作item.options
       let cloneOption = cloneDeep(option)
-      if (cloneOption.info instanceof Array) {
+      let currentOption = {}
+      if (option.info instanceof Array) {
         // 1.选项中存在子选项info，item.options显示当前选项和info选项
-        item.options = [cloneOption, ...cloneOption.info]
+        currentOption = cloneDeep(this.cacheFilterOptions[index].find(filter => filter.value === option.value))
+        this.localFilterItems[index].options = [currentOption, ...currentOption.info]
       } else if (cloneOption.parent instanceof Object) {
         // 2.选项中存在父选项parent，这种情况只有在父选项点击过一次之后出现(即条件1触发之后才有机会触发)，item.options显示其父选项和当前选项
         for (const info of cloneOption.parent.info) {
@@ -438,13 +440,14 @@ export default {
         item.options = [cloneOption]
       }
       cloneOption = null
+      currentOption = null
     },
     // 复杂多选框-单选模式-未选中状态回调
     handleUncheckedSingleCheckboxOptions(option, item, index) {
       // 如果非选中状态，存在两种情况，单选模式下取消选中和多选模式下取消选中
       if (this.filter[item.prop]?.length === 1) {
         // 单选取消选中时，直接从闭包缓存中重置全部配置选项
-        item.options = cloneDeep(this.cacheFilterItems[index])
+        item.options = cloneDeep(this.cacheFilterOptions[index])
       } else {
         // 复选取消选中时，根据option.value的值，来判断需要删除的选项
         const value = option.value
@@ -462,7 +465,7 @@ export default {
           item.options = cloneDeep(remains)
         } else {
           // 如果无剩余选项，则从闭包缓存中重置全部配置选项
-          item.options = cloneDeep(this.cacheFilterItems[index])
+          item.options = cloneDeep(this.cacheFilterOptions[index])
         }
         // 条件筛选中保存的实际已选中数据，根据剩余选项的元素做筛选，仅保留在场选项
         item.model = item.model.filter(model => remains.map(remain => remain.value).includes(model))
@@ -490,7 +493,7 @@ export default {
         }
         item.options = cloneDeep(completeOptions)
       } else {
-        item.options = cloneDeep(this.cacheFilterItems[index])
+        item.options = cloneDeep(this.cacheFilterOptions[index])
       }
       this.forceRendering(item)
     }
