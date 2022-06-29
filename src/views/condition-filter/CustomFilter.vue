@@ -30,8 +30,8 @@
         v-model="item.model"
         :options="item.options"
         @on-change="onConditionChange"
-        @update-singleCheckboxOptions="updateSingleCheckboxOptions($event, item, index)"
-        @update-multipleCheckboxOptions="updateMultipleCheckboxOptions($event, item, index)"
+        @update-singleCheckboxOptions="updateSingleCheckboxOptions($event, index, item)"
+        @update-multipleCheckboxOptions="updateMultipleCheckboxOptions($event, index, item)"
       />
     </filter-container>
   </div>
@@ -39,7 +39,6 @@
 
 <script>
 import { Debounce, ParentCopy } from '@/utils/decorators'
-import cloneDeep from 'lodash/cloneDeep'
 import FilterContainer from '@/components/condition-filter/elements/FilterContainer'
 import SelectedList from '@/components/condition-filter/elements/SelectedList'
 import FilterCheckboxGroup from '@/components/condition-filter/elements/FilterCheckboxGroup'
@@ -364,8 +363,8 @@ export default {
       immediate: true,
       @ParentCopy()
       handler(items) {
-        let cloneItems = cloneDeep(items)
-        let cloneOptions = cloneDeep(items.map(item => item.options))
+        let cloneItems = this.cloneDeep(items)
+        let cloneOptions = this.cloneDeep(items.map(item => item.options))
         this.localFilterItems = cloneItems
         this.cacheFilterOptions = cloneOptions
         cloneItems = null
@@ -389,6 +388,10 @@ export default {
     }
   },
   methods: {
+    cloneDeep(target) {
+      if (typeof target === 'object') return JSON.parse(JSON.stringify(target))
+      else return target
+    },
     onClickSelectedItem() {
       console.log(arguments)
     },
@@ -400,7 +403,11 @@ export default {
     onConditionChange() {
       console.log(this.filter)
     },
-    // 组件强制重载渲染
+
+    /**
+     * @description 组件强制重载渲染
+     * @param item: { type: string }
+     */
     forceRendering(item) {
       // 组件强制重新渲染
       const originalType = item.type
@@ -409,92 +416,169 @@ export default {
         item.type = originalType
       })
     },
-    // 复杂多选框在单选模式下点击选项的回调函数
-    updateSingleCheckboxOptions({ option, checked }, item, index) {
-      if (checked) {
-        this.handleCheckedSingleCheckboxOptions(option, item, index)
+
+    /**
+     * @description 复杂多选框-父选项与子选项的查找结果返回，条件
+     * @param value 鼠标点中的值
+     * @param index 筛选栏所在目录索引
+     * @returns {{parentResult: { info?, label, value } | undefined, infoResult: { parentIndex, label, value } | undefined}}
+     * @description 二者至少有其一不为空
+     */
+    queryParentAndInfoResultFromCheckbox(value, index) {
+      const parentResult = this.cloneDeep(this.cacheFilterOptions[index].find(filter => filter.value === value))
+      let infoOptions = []
+      this.cacheFilterOptions[index].forEach(filter => {
+        if (filter.info instanceof Array) {
+          infoOptions.push(...filter.info)
+        }
+      })
+      const infoResult = this.cloneDeep(infoOptions.find(info => info.value === value))
+      infoOptions = null
+      return { parentResult, infoResult }
+    },
+
+    /**
+     * @description 已知父选项，返回父选项与其可能的子选项的解构数组
+     * @param parentResult
+     * @returns {[{ info?, label, value }]}
+     */
+    getParentOptions(parentResult) {
+      if (parentResult.info instanceof Array) {
+        // 如果父选项存在且含有子选项配置，则显示父选项与其子选项的全部选项
+        return [parentResult, ...parentResult.info]
       } else {
-        this.handleUncheckedSingleCheckboxOptions(option, item, index)
+        // 如果父选项没有子选项配置，则只显示该选项
+        return [parentResult]
+      }
+    },
+
+    /**
+     * @description 已知子选项及当前筛选栏索引，返回包含该子选项的父选项与该子选项
+     * @param infoResult
+     * @param index
+     * @returns {[{label, value, parentIndex?, info? }]}
+     */
+    getInfoOptions(infoResult, index) {
+      if (infoResult.hasOwnProperty('parentIndex')) {
+        const parentOption = this.cacheFilterOptions[index][infoResult.parentIndex];
+        return [parentOption, infoResult];
+      } else {
+        const parentOption = this.cacheFilterOptions[index].find(parent => {
+          if (parent.info instanceof Array) {
+            return parent.info.some(info => info.value === infoResult.value)
+          } else return false
+        })
+        if (parentOption) {
+          return [parentOption, infoResult]
+        } else return [infoResult]
+      }
+    },
+
+    /**
+     * @description 复杂多选框在单选模式下点击选项的回调函数
+     * @param option: { info?: Array, label: string, value: string }
+     * @param checked: boolean
+     * @param index: number
+     * @param item: { type: string, prop: string, options: Array }
+     */
+    updateSingleCheckboxOptions({ option, checked }, index, item) {
+      if (checked) {
+        this.handleCheckedSingleCheckboxOptions(option, index)
+      } else {
+        this.handleUncheckedSingleCheckboxOptions(option, index)
       }
       this.forceRendering(item)
     },
-    // 复杂多选框-单选模式-选中状态回调
-    handleCheckedSingleCheckboxOptions(option, item, index) {
-      // 如果为选中状态，存在三种情况，均需要操作item.options
-      let cloneOption = cloneDeep(option)
-      let currentOption = {}
-      if (option.info instanceof Array) {
-        // 1.选项中存在子选项info，item.options显示当前选项和info选项
-        currentOption = cloneDeep(this.cacheFilterOptions[index].find(filter => filter.value === option.value))
-        this.localFilterItems[index].options = [currentOption, ...currentOption.info]
-      } else if (cloneOption.parent instanceof Object) {
-        // 2.选项中存在父选项parent，这种情况只有在父选项点击过一次之后出现(即条件1触发之后才有机会触发)，item.options显示其父选项和当前选项
-        for (const info of cloneOption.parent.info) {
-          if (!info.parent) {
-            info.parent = cloneDeep(cloneOption.parent)
-          }
-        }
-        item.options = [cloneOption.parent, cloneOption]
-      } else {
-        // 3.选项中既不存在父选项parent，也不存在子选项info，item.options仅显示当前选项
-        item.options = [cloneOption]
+
+    /**
+     * @description 复杂多选框-单选模式-选中状态回调
+     * @param option: { label: string, value: string }
+     * @param index: number
+     */
+    handleCheckedSingleCheckboxOptions(option, index) {
+      let checkOption = []
+      const { parentResult, infoResult } = this.queryParentAndInfoResultFromCheckbox(option.value, index)
+      if (parentResult) {
+        checkOption = this.getParentOptions(parentResult)
       }
-      cloneOption = null
-      currentOption = null
+      // 父选项为空，则表示选中项为子选项
+      if (infoResult) {
+        checkOption = this.getInfoOptions(infoResult, index)
+      }
+      this.localFilterItems[index].options = this.cloneDeep(checkOption)
     },
-    // 复杂多选框-单选模式-未选中状态回调
-    handleUncheckedSingleCheckboxOptions(option, item, index) {
+
+    /**
+     * @description 复杂多选框-单选模式-未选中状态回调
+     * @param option: { label: string, value: string }
+     * @param index: number
+     */
+    handleUncheckedSingleCheckboxOptions(option, index) {
       // 如果非选中状态，存在两种情况，单选模式下取消选中和多选模式下取消选中
-      if (this.filter[item.prop]?.length === 1) {
+      const prop = this.localFilterItems[index].prop
+      if (this.filter[prop]?.length === 1) {
         // 单选取消选中时，直接从闭包缓存中重置全部配置选项
-        item.options = cloneDeep(this.cacheFilterOptions[index])
+        this.localFilterItems[index].options = this.cloneDeep(this.cacheFilterOptions[index])
       } else {
+        let uncheckOption = []
         // 复选取消选中时，根据option.value的值，来判断需要删除的选项
-        const value = option.value
-        const remains = cloneDeep(item.options.filter(remainOption => {
-          if (remainOption.parent) {
-            // 如果取消的是子选项(含有parent)，则该选项、其兄弟选项、其父选项均保留
-            return remainOption.value === value || remainOption.parent?.value.indexOf(value)
+        const { parentResult } = this.queryParentAndInfoResultFromCheckbox(option.value, index)
+        // 取消选中为父选项时，在当前已显示配置项中，筛选中不包含父选项及其子选项的部分放入remains中
+        if (parentResult) {
+          let remains = this.localFilterItems[index].options.filter(remain => {
+            let parentValue = parentResult.value
+            let infoValue = []
+            if (parentResult.info instanceof Array) {
+              infoValue = parentResult.info.map(info => info.value)
+            }
+            return !([parentValue, ...infoValue].some(filterValue => filterValue === remain.value))
+          })
+          if (remains.length) {
+            // 如果剩余选项长度不为0，则深拷贝赋值当前选项
+            uncheckOption = remains
           } else {
-            // 如果取消的是父选项，则删除该选项和其所有子选项
-            return remainOption.value.indexOf(value)
+            // 如果无剩余选项，则从闭包缓存中重置全部配置选项
+            uncheckOption = this.cacheFilterOptions[index]
           }
-        }))
-        if (remains.length) {
-          // 如果剩余选项长度不为0，则深拷贝赋值当前选项
-          item.options = cloneDeep(remains)
-        } else {
-          // 如果无剩余选项，则从闭包缓存中重置全部配置选项
-          item.options = cloneDeep(this.cacheFilterOptions[index])
+          // 条件筛选中保存的实际已选中数据，根据剩余选项的元素做筛选，仅保留在场选项
+          this.localFilterItems[index].model = this.localFilterItems[index].model.filter(model => remains.map(remain => remain.value).includes(model))
+          this.localFilterItems[index].options = this.cloneDeep(uncheckOption)
+          remains = null
         }
-        // 条件筛选中保存的实际已选中数据，根据剩余选项的元素做筛选，仅保留在场选项
-        item.model = item.model.filter(model => remains.map(remain => remain.value).includes(model))
+        // 取消选中项为子选项时，子选项取消选中仅只是取消选中状态，不修改options配置项
       }
     },
-    // 复杂多选框-复选模式下-点击确定按钮回调
-    updateMultipleCheckboxOptions(selectedList, item, index) {
+
+    /**
+     * @description 复杂多选框-复选模式下-点击确定按钮回调
+     * @param selectedList: {label: string, value: string}[]
+     * @param index: number
+     * @param item: { type: string, prop: string, options: Array }
+     */
+    updateMultipleCheckboxOptions(selectedList, index, item) {
+      let completeOptions = []
       if (selectedList?.length) {
-        const completeOptions = []
         for (const list of selectedList) {
-          if (!list.parent) {
-            if (list.info instanceof Array) {
-              completeOptions.push(list, ...list.info)
-            } else completeOptions.push(list)
-          } else {
-            if (!completeOptions.some(select => select.value === list.parent.value)) {
-              for (const info of list.parent.info) {
-                if (!info.parent) {
-                  this.$set(info, 'parent', cloneDeep(list.parent))
-                }
-              }
-              completeOptions.push(list.parent, ...list.parent.info)
-            }
+          // 父选项选中时才考虑增加额外选项，子选项选中or取消选中不影响options选项
+          const { parentResult, infoResult } = this.queryParentAndInfoResultFromCheckbox(list.value, index)
+          let result = []
+          if (parentResult) {
+            result = this.getParentOptions(parentResult)
           }
+          if (infoResult) {
+            result = this.getInfoOptions(infoResult, index)
+          }
+          // 仅推入completeOptions中不存在的配置
+          result.forEach(option => {
+            if (!completeOptions.some(completeOption => completeOption.value === option.value)) {
+              completeOptions.push(...result);
+            }
+          })
         }
-        item.options = cloneDeep(completeOptions)
       } else {
-        item.options = cloneDeep(this.cacheFilterOptions[index])
+        completeOptions = this.cacheFilterOptions[index]
       }
+      this.localFilterItems[index].options = this.cloneDeep(completeOptions)
       this.forceRendering(item)
     }
   }

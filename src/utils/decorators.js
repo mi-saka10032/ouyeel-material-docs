@@ -28,24 +28,20 @@ export function ParentCopy() {
       if (cloneItems instanceof Array) {
         for (const item of cloneItems) {
           if (item.options instanceof Array) {
-            for (const option of item.options) {
+            item.options.forEach((option, optionIndex) => {
               if (option.info instanceof Array) {
                 for (const info of option.info) {
-                  // 如果info对象上不存在parent对象，则添加parent对象
+                  // 如果info对象上不存在parent对象，则添加parentIndex
                   if ((!info.parent) && (typeof option.label === 'number' || 'string') && (typeof option.value === 'number' || 'string')) {
-                    info.parent = {
-                      label: option.label,
-                      value: option.value
-                    }
+                    info.parentIndex = optionIndex
                   }
                 }
               }
-            }
+            })
           }
         }
       }
       await fn.call(this, cloneItems)
-      cloneItems = null
     }
   }
 }
