@@ -21,13 +21,13 @@
     >
       <filter-checkbox-group
         v-if="item.type === 'radio'"
-        v-model="item.model"
+        v-model="filter[item.prop]"
         :options="item.options"
         @on-change="onConditionChange"
       />
       <collapse-checkbox-group
         v-else-if="item.type === 'checkbox'"
-        v-model="item.model"
+        v-model="filter[item.prop]"
         :options="item.options"
         @on-change="onConditionChange"
         @update-singleCheckboxOptions="updateSingleCheckboxOptions($event, index, item)"
@@ -60,7 +60,6 @@ export default {
           type: 'radio',
           title: '竞买方式',
           prop: 'biddingType',
-          model: [],
           options: [
             { 'label': '竞价', 'value': '10' },
             { 'label': '一口价', 'value': '30' },
@@ -71,7 +70,6 @@ export default {
           type: 'checkbox',
           title: '品类',
           prop: 'category',
-          model: [],
           options: [
             {
               'label': '卷状可利用材',
@@ -377,10 +375,15 @@ export default {
       handler(items) {
         if (items instanceof Array) {
           for (const item of items) {
-            if (this.filter[item.prop]) {
-              this.filter[item.prop] = item.model
-            } else {
-              this.$set(this.filter, item.prop, item.model)
+            if (!this.filter.hasOwnProperty(item.prop.toString())) {
+              let model
+              switch (item.type) {
+                case 'radio':
+                case 'checkbox':
+                  model = []
+                  break
+              }
+              this.$set(this.filter, item.prop, model)
             }
           }
         }
@@ -516,7 +519,7 @@ export default {
     handleUncheckedSingleCheckboxOptions(option, index) {
       // 如果非选中状态，存在两种情况，单选模式下取消选中和多选模式下取消选中
       const prop = this.localFilterItems[index].prop
-      if (this.filter[prop]?.length === 1) {
+      if (this.filter[prop]?.length === 0) {
         // 单选取消选中时，直接从闭包缓存中重置全部配置选项
         this.localFilterItems[index].options = this.cloneDeep(this.cacheFilterOptions[index])
       } else {
@@ -531,7 +534,7 @@ export default {
             if (parentResult.info instanceof Array) {
               infoValue = parentResult.info.map(info => info.value)
             }
-            return !([parentValue, ...infoValue].some(filterValue => filterValue === remain.value))
+            return ![parentValue, ...infoValue].some(filterValue => filterValue === remain.value)
           })
           if (remains.length) {
             // 如果剩余选项长度不为0，则深拷贝赋值当前选项
@@ -541,7 +544,8 @@ export default {
             uncheckOption = this.cacheFilterOptions[index]
           }
           // 条件筛选中保存的实际已选中数据，根据剩余选项的元素做筛选，仅保留在场选项
-          this.localFilterItems[index].model = this.localFilterItems[index].model.filter(model => remains.map(remain => remain.value).includes(model))
+          console.log(uncheckOption)
+          this.filter[prop] = this.filter[prop].filter(model => remains.map(remain => remain.value).includes(model))
           this.localFilterItems[index].options = this.cloneDeep(uncheckOption)
           remains = null
         }
